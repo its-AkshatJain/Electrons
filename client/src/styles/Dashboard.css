@@ -1,0 +1,15 @@
+.users-button {
+  text-decoration: none;
+  background-color: #6c5ce7;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  margin-right: 10px;
+  display: inline-flex;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.users-button:hover {
+  background-color: #5649c0;
+}
