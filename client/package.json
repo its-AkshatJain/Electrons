@@ -12,13 +12,14 @@
   "dependencies": {
     "@auth0/auth0-react": "^2.3.0",
     "@tailwindcss/vite": "^4.0.9",
-    "axios": "^1.8.1",
+    "axios": "^1.8.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.476.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.2.0",
+    "react-router-dom": "^7.3.0",
+    "react-toastify": "^11.0.5",
     "socket.io-client": "^4.8.1",
     "tailwindcss": "^4.0.9",
     "twilio": "^5.4.5"

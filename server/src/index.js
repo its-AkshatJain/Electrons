@@ -1,30 +1,30 @@
-// backend/src/server.js
-import express from 'express';
-import dotenv from 'dotenv';
-import connectDB from './config/database.js';
-
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import session from "express-session";
+import passport from "passport";
+import connectDB from "./config/database.js";
+import "./config/passport.js"; // Import Passport configuration
+import authRoutes from "./routes/authRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 dotenv.config();
-
-// Connect to MongoDB
 connectDB();
 
 const app = express();
 
-// Middleware to parse JSON requests
+// Middleware
 app.use(express.json());
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cookieParser());
+app.use(session({ secret: "secret", resave: false, saveUninitialized: true }));
+app.use(passport.initialize());
+app.use(passport.session());
 
-// Use the user routes
-// app.use('/api/users', userRoutes);
+// Routes
+app.use("/auth", authRoutes);
+app.use("/admin", adminRoutes);
 
-// Global error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Internal Server Error' });
-});
-
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
