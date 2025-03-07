@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Users, Map as MapIcon, AlertTriangle, Navigation, Menu, X, Settings, User, Shield, Zap, Clock, FileText, RefreshCw, Sun, Moon, MapPin } from 'lucide-react';
+import { Bell, Users, Map as MapIcon, AlertTriangle, Navigation, Menu, X, Settings, User, Shield, Zap, Clock, FileText, RefreshCw, Sun, Moon, MapPin,LogOut } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { useNavigate } from 'react-router-dom';
 
 // Fix for default marker icons in Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -24,6 +25,7 @@ const RecenterMap = ({ position }) => {
 };
 
 const CrowdSafetyApp = () => {
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentTab, setCurrentTab] = useState('map');
   const [alertLevel, setAlertLevel] = useState('normal'); // normal, warning, danger
@@ -42,6 +44,11 @@ const CrowdSafetyApp = () => {
     { id: 2, lat: 0, lng: 0, density: 65, radius: 40 },
     { id: 3, lat: 0, lng: 0, density: 82, radius: 30 }
   ]);
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    navigate("/login");
+  };
 
   // Request location permission when component mounts
   useEffect(() => {
@@ -273,6 +280,13 @@ const CrowdSafetyApp = () => {
               onClick={toggleTheme}
             >
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button 
+              className={`flex items-center space-x-1 px-3 py-1.5 rounded-full ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-red-400' : 'bg-gray-100 hover:bg-gray-200 text-red-500'} transition-colors`}
+              onClick={handleLogout}
+            >
+              <LogOut size={16} />
+              <span className="text-sm font-medium ml-1">Logout</span>
             </button>
             
             <div className={`flex items-center space-x-2 px-3 py-1 rounded-full ${getAlertColor()} text-white transition-colors duration-500`}>
