@@ -3,7 +3,6 @@ import Login from "./components/Login";
 import Signup from "./components/Signup";
 import AdminDashboard from "./components/AdminDashboard";
 import UserDashboard from "./components/UserDashboard";
-import CrowdSafetyApp from "./components/CrowdSafetyApp";
 
 export default function App() {
   return (
@@ -14,7 +13,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
-          <Route path="/user-dashboard" element={<CrowdSafetyApp />} />
+          <Route path="/user-dashboard" element={<UserDashboard />} />
         </Routes>
 
     </Router>
