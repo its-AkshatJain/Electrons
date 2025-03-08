@@ -2,7 +2,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import User from "../models/User.js"; // MongoDB User Model
+import User from "../models/userModel.js"; // MongoDB User Model
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
