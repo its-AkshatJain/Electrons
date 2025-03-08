@@ -490,7 +490,7 @@ const UserDasboard = () => {
                 </h3>
                 
                 {userLocation ? (
-                  <div className="mt-3 h-40 rounded overflow-hidden">
+                  <div className="mt-3 h-40 rounded overflow-hidden " style={{ position: 'relative', zIndex: '0' }}>
                     <MapContainer 
                       center={[userLocation.latitude, userLocation.longitude]} 
                       zoom={15} 
