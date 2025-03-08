@@ -54,8 +54,11 @@ const UserDasboard = () => {
   // Arduino-related state
   const [serialPort, setSerialPort] = useState(null);
   const [isArduinoConnected, setIsArduinoConnected] = useState(false);
+  const [isArduinoConnecting, setIsArduinoConnecting] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [alertThreshold, setAlertThreshold] = useState(40);
   const lastNotificationSent = useRef(0);
+  const autoConnectAttempted = useRef(false);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -63,6 +66,104 @@ const UserDasboard = () => {
     navigate("/login");
   };
 
+  // Auto-connect to Arduino
+  useEffect(() => {
+    const tryAutoConnect = async () => {
+      if (autoConnectAttempted.current || isArduinoConnected || isArduinoConnecting) {
+        return;
+      }
+      
+      autoConnectAttempted.current = true;
+      setIsArduinoConnecting(true);
+      
+      try {
+        // Check if we have previously paired devices
+        const ports = await navigator.serial.getPorts();
+        
+        if (ports.length > 0) {
+          // If we have previously paired devices, use the first one
+          const port = ports[0];
+          
+          try {
+            await port.open({ baudRate: 9600 });
+            setSerialPort(port);
+            setIsArduinoConnected(true);
+            
+            // Add notification about connection
+            const newNotification = {
+              id: Date.now(),
+              message: "Arduino connected automatically",
+              time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+              severity: "info"
+            };
+            setNotifications(prev => [newNotification, ...prev]);
+            
+            // Test the connection after a brief delay
+            setTimeout(() => {
+              sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`);
+            }, 1000);
+          } catch (error) {
+            console.error("Error auto-connecting to Arduino:", error);
+            // We'll fall back to the request port popup if auto-connect fails
+            manualConnectToArduino();
+          }
+        } else {
+          // If no previously paired devices, we have to request access
+          manualConnectToArduino();
+        }
+      } catch (error) {
+        console.error("Error checking for Arduino ports:", error);
+        setIsArduinoConnecting(false);
+      }
+    };
+    
+    // Try to auto-connect after a short delay
+    const timer = setTimeout(() => {
+      tryAutoConnect();
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [crowdDensity]);
+
+  // Function to connect to Arduino via Web Serial API with manual popup
+  const manualConnectToArduino = async () => {
+    setIsArduinoConnecting(true);
+    setConnectionAttempts(prev => prev + 1);
+    
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      setSerialPort(port);
+      setIsArduinoConnected(true);
+      
+      // Add notification about connection
+      const newNotification = {
+        id: Date.now(),
+        message: "Arduino connected successfully",
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        severity: "info"
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+      
+      // Test the connection
+      setTimeout(() => {
+        sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`);
+      }, 1000);
+    } catch (error) {
+      console.error("Error connecting to Arduino:", error);
+      // Add notification about failed connection
+      const newNotification = {
+        id: Date.now(),
+        message: "Failed to connect to Arduino: " + error.message,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        severity: "warning"
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+    } finally {
+      setIsArduinoConnecting(false);
+    }
+  };
+  
   // Request location permission when component mounts
   useEffect(() => {
     requestLocationPermission();
@@ -126,40 +227,6 @@ const UserDasboard = () => {
       },
       { enableHighAccuracy: true }
     );
-  };
-  
-  // Function to connect to Arduino via Web Serial API
-  const connectToArduino = async () => {
-    try {
-      const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 9600 });
-      setSerialPort(port);
-      setIsArduinoConnected(true);
-      
-      // Add notification about connection
-      const newNotification = {
-        id: Date.now(),
-        message: "Arduino connected successfully",
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-        severity: "info"
-      };
-      setNotifications(prev => [newNotification, ...prev]);
-      
-      // Test the connection
-      setTimeout(() => {
-        sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`);
-      }, 1000);
-    } catch (error) {
-      console.error("Error connecting to Arduino:", error);
-      // Add notification about failed connection
-      const newNotification = {
-        id: Date.now(),
-        message: "Failed to connect to Arduino: " + error.message,
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-        severity: "warning"
-      };
-      setNotifications(prev => [newNotification, ...prev]);
-    }
   };
   
   // Improved function to send alert to Arduino
@@ -360,22 +427,33 @@ const UserDasboard = () => {
               <div className={`mb-4 p-3 rounded-lg shadow-md ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-sm">Arduino Alert Device</p>
-                  <button 
-                    className={`px-3 py-1 text-xs rounded-lg ${
-                      isArduinoConnected 
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' 
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    }`}
-                    onClick={connectToArduino}
-                    disabled={isArduinoConnected}
-                  >
-                    {isArduinoConnected ? "Connected" : "Connect Device"}
-                  </button>
+                  {isArduinoConnecting ? (
+                    <div className="flex items-center">
+                      <RefreshCw size={16} className="animate-spin mr-1 text-blue-500" />
+                      <span className="text-xs text-blue-500">Connecting...</span>
+                    </div>
+                  ) : (
+                    <button 
+                      className={`px-3 py-1 text-xs rounded-lg ${
+                        isArduinoConnected 
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' 
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                      onClick={manualConnectToArduino}
+                      disabled={isArduinoConnected || isArduinoConnecting}
+                    >
+                      {isArduinoConnected ? "Connected" : "Connect Device"}
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs mt-2 text-gray-500 dark:text-gray-400">
                   {isArduinoConnected 
                     ? `Connected. Will alert when crowd density exceeds ${alertThreshold}%` 
-                    : "Connect your Arduino device to receive alerts"}
+                    : isArduinoConnecting
+                      ? "Attempting to connect automatically..."
+                      : connectionAttempts === 0
+                        ? "Connecting to device automatically..."
+                        : "Please connect your Arduino device"}
                 </p>
                 {isArduinoConnected && (
                   <button 
@@ -575,7 +653,7 @@ const UserDasboard = () => {
                     <div>
                       <span className="text-sm block">Arduino Alert Device</span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {isArduinoConnected ? "Connected" : "Not connected"}
+                        {isArduinoConnected ? "Connected" : isArduinoConnecting ? "Connecting..." : "Not connected"}
                       </span>
                     </div>
                     <button 
@@ -584,10 +662,10 @@ const UserDasboard = () => {
                           ? 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200' 
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
                       }`}
-                      onClick={connectToArduino}
-                      disabled={isArduinoConnected}
+                      onClick={manualConnectToArduino}
+                      disabled={isArduinoConnected || isArduinoConnecting}
                     >
-                      {isArduinoConnected ? "Connected" : "Connect"}
+                      {isArduinoConnected ? "Connected" : isArduinoConnecting ? "Connecting..." : "Connect"}
                     </button>
                   </div>
                   
