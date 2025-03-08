@@ -1,0 +1,281 @@
+{
+    "campusName": "NIT Hamirpur",
+    "location": {
+      "latitude": 31.7084,
+      "longitude": 76.5274,
+      "address": "NIT Hamirpur, Anu, Himachal Pradesh 177005, India"
+    },
+    "buildings": [
+      {
+        "id": "admin-block",
+        "name": "Administrative Block",
+        "type": "academic",
+        "coordinates": {
+          "latitude": 31.7089,
+          "longitude": 76.5278
+        },
+        "exits": [
+          {
+            "id": "admin-exit-main",
+            "name": "Main Entrance",
+            "type": "main",
+            "coordinates": {
+              "latitude": 31.7090,
+              "longitude": 76.5279
+            }
+          },
+          {
+            "id": "admin-exit-emergency",
+            "name": "Emergency Exit",
+            "type": "emergency",
+            "coordinates": {
+              "latitude": 31.7088,
+              "longitude": 76.5280
+            }
+          }
+        ]
+      },
+      {
+        "id": "auditorium",
+        "name": "Auditorium",
+        "type": "gathering",
+        "capacity": 800,
+        "coordinates": {
+          "latitude": 31.7082,
+          "longitude": 76.5281
+        },
+        "exits": [
+          {
+            "id": "auditorium-exit-main",
+            "name": "Main Entrance",
+            "type": "main",
+            "coordinates": {
+              "latitude": 31.7083,
+              "longitude": 76.5282
+            }
+          },
+          {
+            "id": "auditorium-exit-side1",
+            "name": "Side Exit 1",
+            "type": "emergency",
+            "coordinates": {
+              "latitude": 31.7081,
+              "longitude": 76.5280
+            }
+          },
+          {
+            "id": "auditorium-exit-side2",
+            "name": "Side Exit 2",
+            "type": "emergency",
+            "coordinates": {
+              "latitude": 31.7080,
+              "longitude": 76.5283
+            }
+          }
+        ]
+      },
+      {
+        "id": "library",
+        "name": "Central Library",
+        "type": "academic",
+        "coordinates": {
+          "latitude": 31.7087,
+          "longitude": 76.5270
+        },
+        "exits": [
+          {
+            "id": "library-exit-main",
+            "name": "Main Entrance",
+            "type": "main",
+            "coordinates": {
+              "latitude": 31.7088,
+              "longitude": 76.5271
+            }
+          },
+          {
+            "id": "library-exit-emergency",
+            "name": "Emergency Exit",
+            "type": "emergency",
+            "coordinates": {
+              "latitude": 31.7086,
+              "longitude": 76.5268
+            }
+          }
+        ]
+      },
+      {
+        "id": "sports-complex",
+        "name": "Sports Complex",
+        "type": "recreation",
+        "coordinates": {
+          "latitude": 31.7075,
+          "longitude": 76.5265
+        },
+        "exits": [
+          {
+            "id": "sports-exit-main",
+            "name": "Main Entrance",
+            "type": "main",
+            "coordinates": {
+              "latitude": 31.7076,
+              "longitude": 76.5266
+            }
+          },
+          {
+            "id": "sports-exit-emergency1",
+            "name": "Emergency Exit 1",
+            "type": "emergency",
+            "coordinates": {
+              "latitude": 31.7074,
+              "longitude": 76.5264
+            }
+          },
+          {
+            "id": "sports-exit-emergency2",
+            "name": "Emergency Exit 2",
+            "type": "emergency",
+            "coordinates": {
+              "latitude": 31.7073,
+              "longitude": 76.5267
+            }
+          }
+        ]
+      },
+      {
+        "id": "csed",
+        "name": "Computer Science Department",
+        "type": "academic",
+        "coordinates": {
+          "latitude": 31.7092,
+          "longitude": 76.5269
+        },
+        "exits": [
+          {
+            "id": "csed-exit-main",
+            "name": "Main Entrance",
+            "type": "main",
+            "coordinates": {
+              "latitude": 31.7093,
+              "longitude": 76.5270
+            }
+          },
+          {
+            "id": "csed-exit-emergency",
+            "name": "Emergency Exit",
+            "type": "emergency",
+            "coordinates": {
+              "latitude": 31.7091,
+              "longitude": 76.5268
+            }
+          }
+        ]
+      }
+    ],
+    "pathways": [
+      {
+        "id": "path-admin-auditorium",
+        "startPoint": "admin-exit-main",
+        "endPoint": "auditorium-exit-main",
+        "distance": 150,
+        "type": "paved"
+      },
+      {
+        "id": "path-admin-library",
+        "startPoint": "admin-exit-main",
+        "endPoint": "library-exit-main",
+        "distance": 120,
+        "type": "paved"
+      },
+      {
+        "id": "path-auditorium-sports",
+        "startPoint": "auditorium-exit-side1",
+        "endPoint": "sports-exit-main",
+        "distance": 200,
+        "type": "paved"
+      },
+      {
+        "id": "path-library-csed",
+        "startPoint": "library-exit-main",
+        "endPoint": "csed-exit-main",
+        "distance": 110,
+        "type": "paved"
+      },
+      {
+        "id": "emergency-path1",
+        "startPoint": "auditorium-exit-side2",
+        "endPoint": "campus-exit-east",
+        "distance": 180,
+        "type": "emergency"
+      },
+      {
+        "id": "emergency-path2",
+        "startPoint": "sports-exit-emergency1",
+        "endPoint": "campus-exit-south",
+        "distance": 150,
+        "type": "emergency"
+      }
+    ],
+    "exits": [
+      {
+        "id": "campus-exit-main",
+        "name": "Main Gate",
+        "type": "main",
+        "coordinates": {
+          "latitude": 31.7094,
+          "longitude": 76.5285
+        }
+      },
+      {
+        "id": "campus-exit-east",
+        "name": "East Gate",
+        "type": "emergency",
+        "coordinates": {
+          "latitude": 31.7085,
+          "longitude": 76.5290
+        }
+      },
+      {
+        "id": "campus-exit-south",
+        "name": "South Gate",
+        "type": "emergency",
+        "coordinates": {
+          "latitude": 31.7070,
+          "longitude": 76.5275
+        }
+      }
+    ],
+    "emergencyInfo": {
+      "assemblyPoints": [
+        {
+          "id": "assembly1",
+          "name": "Main Ground Assembly Point",
+          "coordinates": {
+            "latitude": 31.7080,
+            "longitude": 76.5286
+          },
+          "capacity": 2000
+        },
+        {
+          "id": "assembly2",
+          "name": "Sports Field Assembly Point",
+          "coordinates": {
+            "latitude": 31.7072,
+            "longitude": 76.5262
+          },
+          "capacity": 1500
+        }
+      ],
+      "emergencyContacts": [
+        {
+          "name": "Campus Security",
+          "phone": "01972-254011",
+          "available24x7": true
+        },
+        {
+          "name": "Medical Center",
+          "phone": "01972-254050",
+          "available24x7": true
+        }
+      ]
+    }
+  }
