@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Users, Map as MapIcon, AlertTriangle, Navigation, Menu, X, Settings, User, Shield, Zap, Clock, FileText, RefreshCw, Sun, Moon, MapPin,LogOut } from 'lucide-react';
+import { 
+  Bell, Users, MapIcon, AlertTriangle, Navigation, Menu, X, Settings, User, Shield, 
+  Zap, Clock, FileText, RefreshCw, Sun, Moon, MapPin, LogOut 
+} from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
+import HeaderNavbar from './HeaderNavbar';
+import SidebarMenu from './SidebarMenu';
+import BottomNavbar from './BottomNavbar';
 
 // Fix for default marker icons in Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -44,6 +50,7 @@ const UserDasboard = () => {
     { id: 2, lat: 0, lng: 0, density: 65, radius: 40 },
     { id: 3, lat: 0, lng: 0, density: 82, radius: 30 }
   ]);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
@@ -78,7 +85,7 @@ const UserDasboard = () => {
         
         // Update crowd hotspots based on user location (simulating real data)
         if (newLocation) {
-          const newHotspots = crowdHotspots.map((hotspot, index) => ({
+          const newHotspots = crowdHotspots.map((hotspot) => ({
             ...hotspot,
             lat: newLocation.latitude + (Math.random() * 0.005 - 0.0025),
             lng: newLocation.longitude + (Math.random() * 0.005 - 0.0025)
@@ -194,181 +201,36 @@ const UserDasboard = () => {
     }
   };
 
-  // Get density color for map circles
-  const getDensityColor = (density) => {
-    if (density > 80) return '#dc2626'; // red-600
-    if (density > 60) return '#f59e0b'; // amber-500
-    return '#10b981'; // emerald-500
-  };
-
-  // Location permission UI
-  const renderLocationPrompt = () => {
-    if (locationPermission === 'prompt') {
-      return (
-        <div className={`absolute top-20 left-0 right-0 mx-auto max-w-sm p-4 rounded-lg shadow-lg z-40 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <h3 className="font-bold mb-2">Share your location</h3>
-          <p className={`text-sm mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            CrowdSafe needs your location to provide accurate crowd density information and safety guidance.
-          </p>
-          <div className="flex justify-end space-x-3">
-            <button 
-              className={`px-4 py-2 rounded-lg ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'}`}
-              onClick={() => setLocationPermission('denied')}
-            >
-              Decline
-            </button>
-            <button 
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-              onClick={requestLocationPermission}
-            >
-              Allow
-            </button>
-          </div>
-        </div>
-      );
-    } else if (locationPermission === 'denied') {
-      return (
-        <div className={`absolute top-20 left-0 right-0 mx-auto max-w-sm p-4 rounded-lg shadow-lg z-40 ${isDarkMode ? 'bg-gray-800 border-red-500 border' : 'bg-white border-red-500 border'}`}>
-          <div className="flex items-start">
-            <AlertTriangle size={20} className="text-red-500 mr-2 flex-shrink-0 mt-1" />
-            <div>
-              <h3 className="font-bold mb-1">Location access required</h3>
-              <p className={`text-sm mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                {locationError || "CrowdSafe needs your location to function properly. Some features will be limited."}
-              </p>
-              <button 
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
-                onClick={requestLocationPermission}
-              >
-                Enable Location
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    } else if (locationPermission === 'loading') {
-      return (
-        <div className={`absolute top-20 left-0 right-0 mx-auto max-w-sm p-4 rounded-lg shadow-lg z-40 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-4 h-4 rounded-full bg-blue-600 animate-pulse"></div>
-            <span>Getting your location...</span>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div className={`flex flex-col h-screen ${isDarkMode ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Header */}
-      <header className={`relative z-20 px-4 py-3 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-md`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <button 
-              className={`p-2 rounded-full ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
-            <h1 className="text-xl font-bold">CrowdSafe</h1>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <button 
-              className={`p-2 rounded-full ${isDarkMode ? 'bg-gray-700 text-yellow-300' : 'bg-gray-100 text-gray-700'} transition-colors`}
-              onClick={toggleTheme}
-            >
-              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <button 
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-full ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-red-400' : 'bg-gray-100 hover:bg-gray-200 text-red-500'} transition-colors`}
-              onClick={handleLogout}
-            >
-              <LogOut size={16} />
-              <span className="text-sm font-medium ml-1">Logout</span>
-            </button>
-            
-            <div className={`flex items-center space-x-2 px-3 py-1 rounded-full ${getAlertColor()} text-white transition-colors duration-500`}>
-              <Users size={18} />
-              <span className="text-sm font-medium">{getAlertText()}</span>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Header Navbar */}
+      <HeaderNavbar 
+        isMenuOpen={isMenuOpen}
+        toggleMenu={() => setIsMenuOpen(!isMenuOpen)}
+        isDarkMode={isDarkMode}
+        toggleTheme={toggleTheme}
+        handleLogout={handleLogout}
+        getAlertColor={getAlertColor}
+        getAlertTextColor={getAlertTextColor}
+        getAlertText={getAlertText}
+      />
       
-      {/* Sliding menu */}
-      <div className={`fixed inset-y-0 left-0 transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} z-30 w-72 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-xl transition-transform duration-300 ease-in-out`}>
-        <div className="flex flex-col h-full pt-16 pb-4">
-          <div className={`flex items-center justify-center py-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-            <div className="flex items-center space-x-3">
-              <div className="p-3 rounded-full bg-blue-600 text-white">
-                <User size={20} />
-              </div>
-              <div>
-                <p className="font-semibold">User Name</p>
-                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>ID: #456789</p>
-              </div>
-            </div>
-          </div>
-          
-          <nav className="flex-1 mt-6 px-4 space-y-1">
-            <button className={`flex items-center w-full px-4 py-3 rounded-lg ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}>
-              <User size={18} className={`mr-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-              <span>Profile</span>
-            </button>
-            <button className={`flex items-center w-full px-4 py-3 rounded-lg ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}>
-              <Settings size={18} className={`mr-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-              <span>Settings</span>
-            </button>
-            <button className={`flex items-center w-full px-4 py-3 rounded-lg ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}>
-              <FileText size={18} className={`mr-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-              <span>Event Information</span>
-            </button>
-            <button className={`flex items-center w-full px-4 py-3 rounded-lg ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}>
-              <Shield size={18} className={`mr-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-              <span>Safety Guide</span>
-            </button>
-            
-            {/* Location details in menu */}
-            {userLocation && (
-              <div className={`mt-4 px-4 py-3 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                <div className="flex items-center mb-2">
-                  <MapPin size={18} className={`mr-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-                  <span className="font-medium">Your Location</span>
-                </div>
-                <div className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                  <p>Lat: {userLocation?.latitude.toFixed(6)}</p>
-                  <p>Long: {userLocation?.longitude.toFixed(6)}</p>
-                  <p className="mt-1">Accuracy: ±{userLocation?.accuracy.toFixed(0)}m</p>
-                </div>
-              </div>
-            )}
-          </nav>
-          
-          <div className="px-6 mt-auto">
-            <button className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-md">
-              Emergency Contact
-            </button>
-            <p className={`text-xs text-center mt-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              Version 1.0.3
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Sidebar Menu */}
+      <SidebarMenu 
+        isMenuOpen={isMenuOpen}
+        isDarkMode={isDarkMode}
+        userLocation={userLocation}
+        requestLocationPermission={requestLocationPermission}
+      />
       
-      {/* Main content area */}
-      <main className={`flex-1 relative overflow-y-auto pb-16 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        {/* Render location permission prompt */}
-        {renderLocationPrompt()}
-        
+      {/* Main Content */}
+      <main className="flex-1 relative overflow-y-auto pb-16">
         {/* Map View */}
         {currentTab === 'map' && (
           <div className="p-4">
             <h2 className="text-lg font-bold mb-3">Crowd Density Map</h2>
-            
             <div className="max-w-md mx-auto">
-              {/* Current Crowd Density - Now above the map */}
+              {/* Current Crowd Density */}
               <div className={`mb-4 p-3 rounded-lg shadow-md ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <p className="font-medium text-sm">Current Crowd Density</p>
@@ -380,8 +242,8 @@ const UserDasboard = () => {
                   <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-gray-200 dark:bg-gray-700">
                     <div 
                       style={{ width: `${crowdDensity}%` }} 
-                      className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getAlertColor()} transition-all duration-500`}>
-                    </div>
+                      className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${getAlertColor()} transition-all duration-500`}
+                    ></div>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                     <span>Low</span>
@@ -395,7 +257,7 @@ const UserDasboard = () => {
                 </div>
               </div>
               
-              {/* Map container - with reduced width */}
+              {/* Map container */}
               <div className="relative rounded-lg overflow-hidden shadow-md h-64 md:h-72">
                 {locationPermission === 'granted' && userLocation ? (
                   <MapContainer 
@@ -425,7 +287,7 @@ const UserDasboard = () => {
                     </Marker>
                     
                     {/* Keep map centered on user's location */}
-                    <RecenterMap position={userLocation ? [userLocation.latitude, userLocation.longitude] : null} />
+                    <RecenterMap position={[userLocation.latitude, userLocation.longitude]} />
                   </MapContainer>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-700">
@@ -677,34 +539,12 @@ const UserDasboard = () => {
         )}
       </main>
       
-      {/* Bottom navigation */}
-      <nav className={`fixed bottom-0 left-0 right-0 z-20 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
-        <div className="flex items-center justify-around">
-          <button 
-            className={`flex flex-col items-center py-3 px-6 ${currentTab === 'map' ? (isDarkMode ? 'text-blue-400' : 'text-blue-600') : (isDarkMode ? 'text-gray-400' : 'text-gray-500')} transition-colors`}
-            onClick={() => setCurrentTab('map')}
-          >
-            <MapIcon size={20} />
-            <span className="text-xs mt-1">Map</span>
-          </button>
-          
-          <button 
-            className={`flex flex-col items-center py-3 px-6 ${currentTab === 'alerts' ? (isDarkMode ? 'text-blue-400' : 'text-blue-600') : (isDarkMode ? 'text-gray-400' : 'text-gray-500')} transition-colors`}
-            onClick={() => setCurrentTab('alerts')}
-          >
-            <Bell size={20} />
-            <span className="text-xs mt-1">Alerts</span>
-          </button>
-          
-          <button 
-            className={`flex flex-col items-center py-3 px-6 ${currentTab === 'safety' ? (isDarkMode ? 'text-blue-400' : 'text-blue-600') : (isDarkMode ? 'text-gray-400' : 'text-gray-500')} transition-colors`}
-            onClick={() => setCurrentTab('safety')}
-          >
-            <Shield size={20} />
-            <span className="text-xs mt-1">Safety</span>
-          </button>
-        </div>
-      </nav>
+      {/* Bottom Navigation */}
+      <BottomNavbar 
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        isDarkMode={isDarkMode}
+      />
       
       {/* Overlay when menu is open */}
       {isMenuOpen && (
