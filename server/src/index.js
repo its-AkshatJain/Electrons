@@ -29,7 +29,5 @@ app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api", locationRoutes);  // The update-location endpoint is now available at /api/update-location
 
-
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
