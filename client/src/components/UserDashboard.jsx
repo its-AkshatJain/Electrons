@@ -196,7 +196,7 @@ const UserDashboard = () => {
           lat: newLocation.latitude + (Math.random() * 0.005 - 0.0025),
           lng: newLocation.longitude + (Math.random() * 0.005 - 0.0025)
         }));
-        setCrowdHotspots(newHotspots);
+        // setCrowdHotspots(newHotspots);
 
         // Add notification about location update
         const newNotification = {
