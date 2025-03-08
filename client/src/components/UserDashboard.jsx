@@ -3,9 +3,12 @@ import {
   Bell, Users, MapIcon, AlertTriangle, Navigation, Menu, X, Settings, User, Shield, 
   Zap, Clock, FileText, RefreshCw, Sun, Moon, MapPin, LogOut 
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+// Import Leaflet Routing Machine and its CSS
+import 'leaflet-routing-machine';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import { useNavigate } from 'react-router-dom';
 import HeaderNavbar from './HeaderNavbar';
 import SidebarMenu from './SidebarMenu';
@@ -27,6 +30,42 @@ const RecenterMap = ({ position }) => {
       map.setView(position, 15);
     }
   }, [position, map]);
+  return null;
+};
+
+// New Component: RoutingMachine using Leaflet Routing Machine
+const RoutingMachine = ({ start, end }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !start || !end) return;
+    const routingControl = L.Routing.control({
+      waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
+      lineOptions: { styles: [{ color: 'blue', weight: 4 }] },
+      createMarker: function(i, waypoint, n) {
+        return L.marker(waypoint.latLng, {
+          icon: L.icon({
+            iconUrl: i === 0
+              ? 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png'
+              : 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+          })
+        });
+      },
+      router: L.Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1'
+      }),
+      addWaypoints: false,
+      routeWhileDragging: false,
+      draggableWaypoints: false,
+      fitSelectedRoutes: true,
+      showAlternatives: false
+    }).addTo(map);
+
+    return () => {
+      map.removeControl(routingControl);
+    };
+  }, [map, start, end]);
   return null;
 };
 
@@ -60,55 +99,48 @@ const UserDashboard = () => {
   const lastNotificationSent = useRef(0);
   const autoConnectAttempted = useRef(false);
 
+  // Route mapping state
+  const [showRoute, setShowRoute] = useState(false);
+  const [selectedExit, setSelectedExit] = useState(null);
+  const [evacuationPoints, setEvacuationPoints] = useState([]);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     navigate("/login");
   };
 
-  // Auto-connect to Arduino
+  // Arduino auto-connect (unchanged)
   useEffect(() => {
     const tryAutoConnect = async () => {
-      if (autoConnectAttempted.current || isArduinoConnected || isArduinoConnecting) {
-        return;
-      }
+      if (autoConnectAttempted.current || isArduinoConnected || isArduinoConnecting) return;
       
       autoConnectAttempted.current = true;
       setIsArduinoConnecting(true);
       
       try {
-        // Check if we have previously paired devices
         const ports = await navigator.serial.getPorts();
-        
         if (ports.length > 0) {
-          // If we have previously paired devices, use the first one
           const port = ports[0];
-          
           try {
             await port.open({ baudRate: 9600 });
             setSerialPort(port);
             setIsArduinoConnected(true);
-            
-            // Add notification about connection
             const newNotification = {
               id: Date.now(),
               message: "Arduino connected automatically",
-              time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }),
               severity: "info"
             };
             setNotifications(prev => [newNotification, ...prev]);
-            
-            // Test the connection after a brief delay
             setTimeout(() => {
               sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`);
             }, 500);
           } catch (error) {
             console.error("Error auto-connecting to Arduino:", error);
-            // We'll fall back to the request port popup if auto-connect fails
             manualConnectToArduino();
           }
         } else {
-          // If no previously paired devices, we have to request access
           manualConnectToArduino();
         }
       } catch (error) {
@@ -117,45 +149,34 @@ const UserDashboard = () => {
       }
     };
     
-    // Try to auto-connect after a short delay
-    const timer = setTimeout(() => {
-      tryAutoConnect();
-    }, 2000);
-    
+    const timer = setTimeout(() => { tryAutoConnect(); }, 2000);
     return () => clearTimeout(timer);
   }, [crowdDensity]);
 
-  // Function to connect to Arduino via Web Serial API with manual popup
   const manualConnectToArduino = async () => {
     setIsArduinoConnecting(true);
     setConnectionAttempts(prev => prev + 1);
-    
     try {
       const port = await navigator.serial.requestPort();
       await port.open({ baudRate: 9600 });
       setSerialPort(port);
       setIsArduinoConnected(true);
-      
-      // Add notification about connection
       const newNotification = {
         id: Date.now(),
         message: "Arduino connected successfully",
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }),
         severity: "info"
       };
       setNotifications(prev => [newNotification, ...prev]);
-      
-      // Test the connection
       setTimeout(() => {
         sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`);
       }, 1000);
     } catch (error) {
       console.error("Error connecting to Arduino:", error);
-      // Add notification about failed connection
       const newNotification = {
         id: Date.now(),
         message: "Failed to connect to Arduino: " + error.message,
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }),
         severity: "warning"
       };
       setNotifications(prev => [newNotification, ...prev]);
@@ -164,21 +185,16 @@ const UserDashboard = () => {
     }
   };
   
-  // Request location permission when component mounts
-  useEffect(() => {
-    requestLocationPermission();
-  }, []);
+  // Request location permission on mount
+  useEffect(() => { requestLocationPermission(); }, []);
 
-  // Function to request location permission
   const requestLocationPermission = () => {
     if (!navigator.geolocation) {
       setLocationError("Geolocation is not supported by your browser");
       setLocationPermission('denied');
       return;
     }
-
     setLocationPermission('loading');
-    
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const newLocation = {
@@ -189,20 +205,10 @@ const UserDashboard = () => {
         setUserLocation(newLocation);
         setLocationPermission('granted');
         setLocationError(null);
-        
-        // Update crowd hotspots (simulate real data)
-        const newHotspots = crowdHotspots.map((hotspot) => ({
-          ...hotspot,
-          lat: newLocation.latitude + (Math.random() * 0.005 - 0.0025),
-          lng: newLocation.longitude + (Math.random() * 0.005 - 0.0025)
-        }));
-        // setCrowdHotspots(newHotspots);
-
-        // Add notification about location update
         const newNotification = {
           id: Date.now(),
           message: "Your location has been updated",
-          time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }),
           severity: "info"
         };
         setNotifications(prev => [newNotification, ...prev]);
@@ -227,26 +233,21 @@ const UserDashboard = () => {
     );
   };
   
-  // Improved function to send alert to Arduino
   const sendAlertToArduino = useCallback(async (message) => {
     if (!serialPort) {
       console.error("No serial port available");
       return;
     }
-    
     try {
       const writer = serialPort.writable.getWriter();
       const encoder = new TextEncoder();
-      // Add newline character at the end of the message
       await writer.write(encoder.encode(message + '\n'));
       console.log("Sent to Arduino:", message);
       writer.releaseLock();
-      
-      // Add notification about alert
       const newNotification = {
         id: Date.now(),
         message: "Alert sent to Arduino device",
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }),
         severity: "warning"
       };
       setNotifications(prev => [newNotification, ...prev]);
@@ -256,14 +257,13 @@ const UserDashboard = () => {
       const newNotification = {
         id: Date.now(),
         message: "Lost connection to Arduino: " + error.message,
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }),
         severity: "warning"
       };
       setNotifications(prev => [newNotification, ...prev]);
     }
   }, [serialPort]);
 
-  // Set up watch position for continuous location updates
   useEffect(() => {
     if (locationPermission === 'granted') {
       const watchId = navigator.geolocation.watchPosition(
@@ -274,17 +274,13 @@ const UserDashboard = () => {
             accuracy: position.coords.accuracy
           });
         },
-        (error) => {
-          console.error("Error watching position:", error);
-        },
+        (error) => { console.error("Error watching position:", error); },
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 3000 }
       );
-      
       return () => navigator.geolocation.clearWatch(watchId);
     }
   }, [locationPermission]);
 
-  // Simulate changing crowd density and send alerts to Arduino
   useEffect(() => {
     const interval = setInterval(() => {
       setCrowdDensity(prev => {
@@ -293,37 +289,29 @@ const UserDashboard = () => {
         if (newValue > 80) setAlertLevel('danger');
         else if (newValue > 60) setAlertLevel('warning');
         else setAlertLevel('normal');
-        
-        // Send alert to Arduino if density is above threshold and we haven't sent one recently
         if (newValue > alertThreshold && isArduinoConnected && Date.now() - lastNotificationSent.current > 15000) {
           lastNotificationSent.current = Date.now();
-          // Send message with format: "ALERT:DENSITY:value"
           sendAlertToArduino(`ALERT:DENSITY:${newValue}`);
           console.log(`Crowd density ${newValue}% exceeds threshold ${alertThreshold}%, alert sent`);
         }
         return newValue;
       });
     }, 3000);
-    
     return () => clearInterval(interval);
   }, [isArduinoConnected, sendAlertToArduino, alertThreshold]);
 
-  // Handle threshold change
   const handleThresholdChange = (e) => {
     const newThreshold = parseInt(e.target.value);
     setAlertThreshold(newThreshold);
-    
-    // Update notification
     const newNotification = {
       id: Date.now(),
       message: `Alert threshold updated to ${newThreshold}%`,
-      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }),
       severity: "info"
     };
     setNotifications(prev => [newNotification, ...prev]);
   };
 
-  // Apply theme to document
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
@@ -355,44 +343,61 @@ const UserDashboard = () => {
     }
   };
 
-  // Update user's IP and location in the database every 10 seconds
+  // Compute evacuation route by marking 4 points: one stampede alert zone and three safe evacuation zones.
+  const computeSafeRoute = () => {
+    if (!userLocation) return;
+    // Define 4 points relative to the user's location:
+    const stampedeZone = { id: 'Stampede', lat: userLocation.latitude, lng: userLocation.longitude };
+    const safeZoneA = { id: 'Gate 1', lat: 31.7084291, lng: 76.5273526 };
+    const safeZoneB = { id: 'Gate 2', lat: 31.7088754, lng: 76.5226386 };
+    
+    // Save these points in state for rendering.
+    setEvacuationPoints([stampedeZone, safeZoneA, safeZoneB]);
+    
+    // Choose the nearest safe zone (exclude the stampede zone) based on Euclidean distance.
+    const safeZones = [safeZoneA, safeZoneB];
+    const distance = (point) =>
+      Math.sqrt(Math.pow(point.lat - userLocation.latitude, 2) + Math.pow(point.lng - userLocation.longitude, 2));
+    const nearestSafeZone = safeZones.reduce((prev, curr) => distance(curr) < distance(prev) ? curr : prev, safeZones[0]);
+    
+    setSelectedExit(nearestSafeZone);
+    setShowRoute(true);
+    const newNotification = {
+      id: Date.now(),
+      message: `Evacuation route computed via Safe Zone ${nearestSafeZone.id}. Stampede Alert Zone is marked separately.`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }),
+      severity: "info"
+    };
+    setNotifications(prev => [newNotification, ...prev]);
+  };
+
   useEffect(() => {
     if (locationPermission === 'granted' && userLocation) {
       const updateUserLocationInDatabase = async () => {
         try {
-          // Fetch user's IP address from an external API
           const ipResponse = await fetch('https://api.ipify.org?format=json');
           const ipData = await ipResponse.json();
           const ipAddress = ipData.ip;
-          
-          // Get a valid user ID from localStorage
           const userId = localStorage.getItem("userId");
           if (!userId) {
             console.error("User ID not found in localStorage");
             return;
           }
-          
           const payload = {
-            userId, // Use the valid user id here
+            userId,
             ip: ipAddress,
             latitude: userLocation.latitude,
             longitude: userLocation.longitude,
           };
-          
           console.log("Sending payload to backend:", payload);
-          
           const response = await fetch('http://localhost:5000/api/update-location', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
-          
           if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
-          
           const data = await response.json();
           console.log('Location updated:', data);
         } catch (error) {
@@ -534,7 +539,7 @@ const UserDashboard = () => {
                       </Popup>
                     </Marker>
                     
-                    {/* Keep map centered on user's location */}
+                    {/* Recenter map on user's location */}
                     <RecenterMap position={[userLocation.latitude, userLocation.longitude]} />
                     
                     {/* Render crowd hotspot markers */}
@@ -559,6 +564,44 @@ const UserDashboard = () => {
                         </Popup>
                       </Marker>
                     ))}
+                    
+                    {/* Render evacuation and stampede markers if available */}
+                    {evacuationPoints.length > 0 && evacuationPoints.map(point => (
+                      <Marker 
+                        key={point.id}
+                        position={[point.lat, point.lng]}
+                        icon={L.divIcon({
+                          className: 'custom-div-icon',
+                          html: `<div style="background-color: ${point.id === 'Stampede' ? 'red' : 'green'}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>`,
+                          iconSize: [20, 20],
+                          iconAnchor: [10, 10]
+                        })}
+                      >
+                        <Popup>
+                          <div>
+                            {point.id === 'Stampede' ? (
+                              <>
+                                <p className="font-semibold">Stampede Alert Zone</p>
+                                <p className="text-xs text-red-600">Potential stampede area</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-semibold">Evacuation Zone {point.id}</p>
+                                <p className="text-xs text-green-600">Safe for evacuation</p>
+                              </>
+                            )}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                    
+                    {/* Render safe route using RoutingMachine if route is computed */}
+                    {showRoute && selectedExit && (
+                      <RoutingMachine 
+                        start={[userLocation.latitude, userLocation.longitude]} 
+                        end={[selectedExit.lat, selectedExit.lng]} 
+                      />
+                    )}
                   </MapContainer>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-700">
@@ -585,6 +628,18 @@ const UserDashboard = () => {
                   </div>
                 )}
               </div>
+              
+              {/* Button to compute evacuation route */}
+              {locationPermission === 'granted' && userLocation && (
+                <div className="mt-4 text-center">
+                  <button 
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"
+                    onClick={computeSafeRoute}
+                  >
+                    Compute Evacuation Route
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
