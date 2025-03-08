@@ -14,6 +14,12 @@ export default function Login() {
       const { data } = await API.post("/auth/login", { email, password });
       localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.role);
+      // Store the user ID from the response
+      if (data.user && data.user._id) {
+        localStorage.setItem("userId", data.user._id);
+      } else {
+        console.error("User data not found in login response");
+      }
       alert("Login successful!");
       if (data.role === "admin") {
         navigate("/admin-dashboard");
