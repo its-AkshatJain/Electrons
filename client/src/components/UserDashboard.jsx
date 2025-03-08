@@ -101,7 +101,7 @@ const UserDasboard = () => {
             // Test the connection after a brief delay
             setTimeout(() => {
               sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`);
-            }, 1000);
+            }, 500);
           } catch (error) {
             console.error("Error auto-connecting to Arduino:", error);
             // We'll fall back to the request port popup if auto-connect fails
@@ -279,7 +279,7 @@ const UserDasboard = () => {
         (error) => {
           console.error("Error watching position:", error);
         },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 3000 }
       );
       
       return () => navigator.geolocation.clearWatch(watchId);
@@ -299,7 +299,7 @@ const UserDasboard = () => {
         else setAlertLevel('normal');
         
         // Send alert to Arduino if density is above threshold and we haven't sent one recently
-        if (newValue > alertThreshold && isArduinoConnected && Date.now() - lastNotificationSent.current > 30000) {
+        if (newValue > alertThreshold && isArduinoConnected && Date.now() - lastNotificationSent.current > 15000) {
           lastNotificationSent.current = Date.now();
           // Send message with format: "ALERT:DENSITY:value"
           sendAlertToArduino(`ALERT:DENSITY:${newValue}`);
@@ -308,7 +308,7 @@ const UserDasboard = () => {
         
         return newValue;
       });
-    }, 5000);
+    }, 3000);
     
     return () => clearInterval(interval);
   }, [isArduinoConnected, sendAlertToArduino, alertThreshold]);
