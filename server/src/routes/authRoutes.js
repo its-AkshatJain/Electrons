@@ -63,11 +63,11 @@ router.get(
       { expiresIn: "1d" }
     );
 
-    // Redirect based on role
+    // Include userId in the redirect URL query parameters
     if (user.role === "admin") {
-      res.redirect(`http://localhost:5173/admin-dashboard?token=${token}&role=${user.role}`);
+      res.redirect(`http://localhost:5173/admin-dashboard?token=${token}&role=${user.role}&userId=${user._id}`);
     } else {
-      res.redirect(`http://localhost:5173/user-dashboard?token=${token}&role=${user.role}`);
+      res.redirect(`http://localhost:5173/user-dashboard?token=${token}&role=${user.role}&userId=${user._id}`);
     }
   }
 );

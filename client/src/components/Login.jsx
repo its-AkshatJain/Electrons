@@ -13,9 +13,14 @@ export default function Login() {
     try {
       const { data } = await API.post("/auth/login", { email, password });
       localStorage.setItem("token", data.token);
-      localStorage.setItem("role", data.role); // Save role
+      localStorage.setItem("role", data.role);
+      // Store the user ID from the response
+      if (data.user && data.user._id) {
+        localStorage.setItem("userId", data.user._id);
+      } else {
+        console.error("User data not found in login response");
+      }
       alert("Login successful!");
-      // Redirect based on role
       if (data.role === "admin") {
         navigate("/admin-dashboard");
       } else {
@@ -25,6 +30,9 @@ export default function Login() {
       alert("Login failed!");
     }
   };
+  
+  
+  
 
   return (
     <div className="flex flex-col items-center p-6 bg-gray-50 min-h-screen">

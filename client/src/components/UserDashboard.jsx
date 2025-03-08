@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bell, Users, MapIcon, AlertTriangle, Navigation, Menu, X, Settings, User, Shield, 
   Zap, Clock, FileText, RefreshCw, Sun, Moon, MapPin, LogOut 
@@ -30,7 +30,7 @@ const RecenterMap = ({ position }) => {
   return null;
 };
 
-const UserDasboard = () => {
+const UserDashboard = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentTab, setCurrentTab] = useState('map');
@@ -50,6 +50,12 @@ const UserDasboard = () => {
     { id: 2, lat: 0, lng: 0, density: 65, radius: 40 },
     { id: 3, lat: 0, lng: 0, density: 82, radius: 30 }
   ]);
+
+  // Create a ref to always hold the latest userLocation
+  const locationRef = useRef(userLocation);
+  useEffect(() => {
+    locationRef.current = userLocation;
+  }, [userLocation]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -83,17 +89,15 @@ const UserDasboard = () => {
         setLocationPermission('granted');
         setLocationError(null);
         
-        // Update crowd hotspots based on user location (simulating real data)
-        if (newLocation) {
-          const newHotspots = crowdHotspots.map((hotspot) => ({
-            ...hotspot,
-            lat: newLocation.latitude + (Math.random() * 0.005 - 0.0025),
-            lng: newLocation.longitude + (Math.random() * 0.005 - 0.0025)
-          }));
-          setCrowdHotspots(newHotspots);
-        }
-        
-        // Add notification about location
+        // Update crowd hotspots (simulate real data)
+        const newHotspots = crowdHotspots.map((hotspot) => ({
+          ...hotspot,
+          lat: newLocation.latitude + (Math.random() * 0.005 - 0.0025),
+          lng: newLocation.longitude + (Math.random() * 0.005 - 0.0025)
+        }));
+        setCrowdHotspots(newHotspots);
+
+        // Add notification about location update
         const newNotification = {
           id: Date.now(),
           message: "Your location has been updated",
@@ -143,18 +147,15 @@ const UserDasboard = () => {
     }
   }, [locationPermission]);
 
-  // Simulate changing crowd density
+  // Simulate changing crowd density every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setCrowdDensity(prev => {
         const change = Math.floor(Math.random() * 7) - 3;
         const newValue = Math.max(10, Math.min(95, prev + change));
-        
-        // Update alert level based on crowd density
         if (newValue > 80) setAlertLevel('danger');
         else if (newValue > 60) setAlertLevel('warning');
         else setAlertLevel('normal');
-        
         return newValue;
       });
     }, 5000);
@@ -164,19 +165,12 @@ const UserDasboard = () => {
 
   // Apply theme to document
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (isDarkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  // Toggle theme
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
+  const toggleTheme = () => setIsDarkMode(prev => !prev);
 
-  // Determine color based on alert level
   const getAlertColor = () => {
     switch(alertLevel) {
       case 'danger': return 'bg-red-600';
@@ -200,6 +194,58 @@ const UserDasboard = () => {
       default: return 'Normal Conditions';
     }
   };
+
+  // Update user's IP and location in the database every 10 seconds
+  useEffect(() => {
+    if (locationPermission === 'granted' && userLocation) {
+      const updateUserLocationInDatabase = async () => {
+        try {
+          // Fetch user's IP address from an external API
+          const ipResponse = await fetch('https://api.ipify.org?format=json');
+          const ipData = await ipResponse.json();
+          const ipAddress = ipData.ip;
+          
+          // Get a valid user ID from localStorage
+          const userId = localStorage.getItem("userId");
+          if (!userId) {
+            console.error("User ID not found in localStorage");
+            return;
+          }
+          
+          const payload = {
+            userId, // Use the valid user id here
+            ip: ipAddress,
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+          };
+          
+          console.log("Sending payload to backend:", payload);
+          
+          const response = await fetch('http://localhost:5000/api/update-location', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          console.log('Location updated:', data);
+        } catch (error) {
+          console.error('Error updating location in database:', error);
+        }
+      };
+  
+      updateUserLocationInDatabase();
+      const intervalId = setInterval(updateUserLocationInDatabase, 10000);
+      return () => clearInterval(intervalId);
+    }
+  }, [locationPermission, userLocation]);
+  
 
   return (
     <div className={`flex flex-col h-screen ${isDarkMode ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
@@ -557,4 +603,4 @@ const UserDasboard = () => {
   );
 };
 
-export default UserDasboard;
+export default UserDashboard;
