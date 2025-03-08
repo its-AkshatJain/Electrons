@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Bell, Users, MapIcon, AlertTriangle, Navigation, Menu, X, Settings, User, Shield, 
   Zap, Clock, FileText, RefreshCw, Sun, Moon, MapPin, LogOut 
@@ -50,12 +50,15 @@ const UserDashboard = () => {
     { id: 2, lat: 0, lng: 0, density: 65, radius: 40 },
     { id: 3, lat: 0, lng: 0, density: 82, radius: 30 }
   ]);
-
-  // Create a ref to always hold the latest userLocation
-  const locationRef = useRef(userLocation);
-  useEffect(() => {
-    locationRef.current = userLocation;
-  }, [userLocation]);
+  
+  // Arduino-related state
+  const [serialPort, setSerialPort] = useState(null);
+  const [isArduinoConnected, setIsArduinoConnected] = useState(false);
+  const [isArduinoConnecting, setIsArduinoConnecting] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [alertThreshold, setAlertThreshold] = useState(40);
+  const lastNotificationSent = useRef(0);
+  const autoConnectAttempted = useRef(false);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -63,6 +66,104 @@ const UserDashboard = () => {
     navigate("/login");
   };
 
+  // Auto-connect to Arduino
+  useEffect(() => {
+    const tryAutoConnect = async () => {
+      if (autoConnectAttempted.current || isArduinoConnected || isArduinoConnecting) {
+        return;
+      }
+      
+      autoConnectAttempted.current = true;
+      setIsArduinoConnecting(true);
+      
+      try {
+        // Check if we have previously paired devices
+        const ports = await navigator.serial.getPorts();
+        
+        if (ports.length > 0) {
+          // If we have previously paired devices, use the first one
+          const port = ports[0];
+          
+          try {
+            await port.open({ baudRate: 9600 });
+            setSerialPort(port);
+            setIsArduinoConnected(true);
+            
+            // Add notification about connection
+            const newNotification = {
+              id: Date.now(),
+              message: "Arduino connected automatically",
+              time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+              severity: "info"
+            };
+            setNotifications(prev => [newNotification, ...prev]);
+            
+            // Test the connection after a brief delay
+            setTimeout(() => {
+              sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`);
+            }, 1000);
+          } catch (error) {
+            console.error("Error auto-connecting to Arduino:", error);
+            // We'll fall back to the request port popup if auto-connect fails
+            manualConnectToArduino();
+          }
+        } else {
+          // If no previously paired devices, we have to request access
+          manualConnectToArduino();
+        }
+      } catch (error) {
+        console.error("Error checking for Arduino ports:", error);
+        setIsArduinoConnecting(false);
+      }
+    };
+    
+    // Try to auto-connect after a short delay
+    const timer = setTimeout(() => {
+      tryAutoConnect();
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [crowdDensity]);
+
+  // Function to connect to Arduino via Web Serial API with manual popup
+  const manualConnectToArduino = async () => {
+    setIsArduinoConnecting(true);
+    setConnectionAttempts(prev => prev + 1);
+    
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      setSerialPort(port);
+      setIsArduinoConnected(true);
+      
+      // Add notification about connection
+      const newNotification = {
+        id: Date.now(),
+        message: "Arduino connected successfully",
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        severity: "info"
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+      
+      // Test the connection
+      setTimeout(() => {
+        sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`);
+      }, 1000);
+    } catch (error) {
+      console.error("Error connecting to Arduino:", error);
+      // Add notification about failed connection
+      const newNotification = {
+        id: Date.now(),
+        message: "Failed to connect to Arduino: " + error.message,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        severity: "warning"
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+    } finally {
+      setIsArduinoConnecting(false);
+    }
+  };
+  
   // Request location permission when component mounts
   useEffect(() => {
     requestLocationPermission();
@@ -125,6 +226,42 @@ const UserDashboard = () => {
       { enableHighAccuracy: true }
     );
   };
+  
+  // Improved function to send alert to Arduino
+  const sendAlertToArduino = useCallback(async (message) => {
+    if (!serialPort) {
+      console.error("No serial port available");
+      return;
+    }
+    
+    try {
+      const writer = serialPort.writable.getWriter();
+      const encoder = new TextEncoder();
+      // Add newline character at the end of the message
+      await writer.write(encoder.encode(message + '\n'));
+      console.log("Sent to Arduino:", message);
+      writer.releaseLock();
+      
+      // Add notification about alert
+      const newNotification = {
+        id: Date.now(),
+        message: "Alert sent to Arduino device",
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        severity: "warning"
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+    } catch (error) {
+      console.error("Error sending alert to Arduino:", error);
+      setIsArduinoConnected(false);
+      const newNotification = {
+        id: Date.now(),
+        message: "Lost connection to Arduino: " + error.message,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        severity: "warning"
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+    }
+  }, [serialPort]);
 
   // Set up watch position for continuous location updates
   useEffect(() => {
@@ -147,7 +284,7 @@ const UserDashboard = () => {
     }
   }, [locationPermission]);
 
-  // Simulate changing crowd density every 5 seconds
+  // Simulate changing crowd density and send alerts to Arduino
   useEffect(() => {
     const interval = setInterval(() => {
       setCrowdDensity(prev => {
@@ -156,12 +293,35 @@ const UserDashboard = () => {
         if (newValue > 80) setAlertLevel('danger');
         else if (newValue > 60) setAlertLevel('warning');
         else setAlertLevel('normal');
+        
+        // Send alert to Arduino if density is above threshold and we haven't sent one recently
+        if (newValue > alertThreshold && isArduinoConnected && Date.now() - lastNotificationSent.current > 30000) {
+          lastNotificationSent.current = Date.now();
+          // Send message with format: "ALERT:DENSITY:value"
+          sendAlertToArduino(`ALERT:DENSITY:${newValue}`);
+          console.log(`Crowd density ${newValue}% exceeds threshold ${alertThreshold}%, alert sent`);
+        }
         return newValue;
       });
     }, 5000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [isArduinoConnected, sendAlertToArduino, alertThreshold]);
+
+  // Handle threshold change
+  const handleThresholdChange = (e) => {
+    const newThreshold = parseInt(e.target.value);
+    setAlertThreshold(newThreshold);
+    
+    // Update notification
+    const newNotification = {
+      id: Date.now(),
+      message: `Alert threshold updated to ${newThreshold}%`,
+      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+      severity: "info"
+    };
+    setNotifications(prev => [newNotification, ...prev]);
+  };
 
   // Apply theme to document
   useEffect(() => {
@@ -303,6 +463,48 @@ const UserDashboard = () => {
                 </div>
               </div>
               
+              {/* Arduino Connection */}
+              <div className={`mb-4 p-3 rounded-lg shadow-md ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-sm">Arduino Alert Device</p>
+                  {isArduinoConnecting ? (
+                    <div className="flex items-center">
+                      <RefreshCw size={16} className="animate-spin mr-1 text-blue-500" />
+                      <span className="text-xs text-blue-500">Connecting...</span>
+                    </div>
+                  ) : (
+                    <button 
+                      className={`px-3 py-1 text-xs rounded-lg ${
+                        isArduinoConnected 
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' 
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                      onClick={manualConnectToArduino}
+                      disabled={isArduinoConnected || isArduinoConnecting}
+                    >
+                      {isArduinoConnected ? "Connected" : "Connect Device"}
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs mt-2 text-gray-500 dark:text-gray-400">
+                  {isArduinoConnected 
+                    ? `Connected. Will alert when crowd density exceeds ${alertThreshold}%` 
+                    : isArduinoConnecting
+                      ? "Attempting to connect automatically..."
+                      : connectionAttempts === 0
+                        ? "Connecting to device automatically..."
+                        : "Please connect your Arduino device"}
+                </p>
+                {isArduinoConnected && (
+                  <button 
+                    className="mt-2 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+                    onClick={() => sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`)}
+                  >
+                    Test Arduino Alert
+                  </button>
+                )}
+              </div>
+              
               {/* Map container */}
               <div className="relative rounded-lg overflow-hidden shadow-md h-64 md:h-72">
                 {locationPermission === 'granted' && userLocation ? (
@@ -334,6 +536,29 @@ const UserDashboard = () => {
                     
                     {/* Keep map centered on user's location */}
                     <RecenterMap position={[userLocation.latitude, userLocation.longitude]} />
+                    
+                    {/* Render crowd hotspot markers */}
+                    {crowdHotspots.map(hotspot => (
+                      <Marker 
+                        key={hotspot.id}
+                        position={[hotspot.lat, hotspot.lng]}
+                        icon={L.divIcon({
+                          className: 'custom-div-icon',
+                          html: `<div style="background-color: rgba(255, 0, 0, ${hotspot.density/100}); width: ${hotspot.radius}px; height: ${hotspot.radius}px; border-radius: 50%; opacity: 0.7;"></div>`,
+                          iconSize: [hotspot.radius, hotspot.radius],
+                          iconAnchor: [hotspot.radius/2, hotspot.radius/2]
+                        })}
+                      >
+                        <Popup>
+                          <div>
+                            <p className="font-semibold">Crowd Hotspot</p>
+                            <p className="text-xs text-red-600">
+                              Density: {hotspot.density}%
+                            </p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
                   </MapContainer>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-700">
@@ -352,234 +577,172 @@ const UserDashboard = () => {
                         </button>
                       </div>
                     ) : (
-                      <div className="text-center">
-                        <MapIcon size={40} className={`mx-auto mb-3 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-                        <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Loading map...
-                        </p>
+                      <div className="text-center p-6">
+                        <RefreshCw size={32} className="mx-auto mb-3 animate-spin text-blue-500" />
+                        <p className="font-medium">Loading map...</p>
                       </div>
                     )}
                   </div>
                 )}
-                
-                {/* Floating map actions */}
-                <div className={`absolute bottom-3 right-3 p-1.5 rounded-full shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                  <button className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md">
-                    <Navigation size={18} />
-                  </button>
-                </div>
-                
-                <div className={`absolute bottom-3 left-3 p-1.5 rounded-full shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                  <button className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md" onClick={requestLocationPermission}>
-                    <RefreshCw size={18} />
-                  </button>
-                </div>
-              </div>
-              
-              {/* Current safety status */}
-              <div className={`mt-4 p-4 rounded-lg ${getAlertColor()} text-white`}>
-                <div className="flex items-start">
-                  {alertLevel === 'danger' && <AlertTriangle className="mr-2 flex-shrink-0" size={20} />}
-                  {alertLevel === 'warning' && <AlertTriangle className="mr-2 flex-shrink-0" size={20} />}
-                  {alertLevel === 'normal' && <Users className="mr-2 flex-shrink-0" size={20} />}
-                  <div>
-                    <h3 className="font-bold">{getAlertText()}</h3>
-                    <p className="text-sm mt-1">
-                      {alertLevel === 'danger' && 'Move to a less crowded area immediately. Keep emergency exits in mind.'}
-                      {alertLevel === 'warning' && 'Be cautious of your surroundings. Consider moving to safer zones.'}
-                      {alertLevel === 'normal' && 'Conditions are currently safe. Enjoy the event responsibly.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Safe spots nearby */}
-              <h3 className="font-medium mt-5 mb-2">Safe Spots Nearby</h3>
-              <div className="space-y-2">
-                <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm flex justify-between items-center`}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 mr-2"></div>
-                    <span>Rest Area</span>
-                  </div>
-                  <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>150m NE</span>
-                </div>
-                <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm flex justify-between items-center`}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 mr-2"></div>
-                    <span>Food Court Section B</span>
-                  </div>
-                  <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>210m W</span>
-                </div>
-                <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm flex justify-between items-center`}>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 mr-2"></div>
-                    <span>South Entrance Plaza</span>
-                  </div>
-                  <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>180m S</span>
-                </div>
               </div>
             </div>
           </div>
         )}
         
-        {/* Alerts View */}
-        {currentTab === 'alerts' && (
+        {/* Notifications View */}
+        {currentTab === 'notifications' && (
           <div className="p-4">
-            <h2 className="text-lg font-bold mb-4">Safety Alerts</h2>
-            
+            <h2 className="text-lg font-bold mb-3">Notifications</h2>
             <div className="max-w-md mx-auto">
-              <div className={`mb-4 p-4 rounded-lg ${getAlertColor()} text-white`}>
-                <div className="flex items-start">
-                  {alertLevel === 'danger' && <AlertTriangle className="mr-2 flex-shrink-0" size={20} />}
-                  {alertLevel === 'warning' && <AlertTriangle className="mr-2 flex-shrink-0" size={20} />}
-                  {alertLevel === 'normal' && <Users className="mr-2 flex-shrink-0" size={20} />}
-                  <div>
-                    <h3 className="font-bold">{getAlertText()}</h3>
-                    <p className="text-sm mt-1">
-                      {alertLevel === 'danger' && 'Move to a less crowded area immediately.'}
-                      {alertLevel === 'warning' && 'Be cautious of your surroundings.'}
-                      {alertLevel === 'normal' && 'Conditions are currently safe.'}
-                    </p>
-                  </div>
+              {notifications.length > 0 ? (
+                <ul className="space-y-2">
+                  {notifications.map(notification => (
+                    <li 
+                      key={notification.id} 
+                      className={`p-3 rounded-lg shadow-md ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}
+                    >
+                      <div className="flex items-start">
+                        <div className="mr-3 mt-1">
+                          {notification.severity === 'warning' && (
+                            <AlertTriangle size={16} className="text-amber-500" />
+                          )}
+                          {notification.severity === 'danger' && (
+                            <AlertTriangle size={16} className="text-red-500" />
+                          )}
+                          {notification.severity === 'info' && (
+                            <Bell size={16} className="text-blue-500" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm">{notification.message}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {notification.time}
+                          </p>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                  <Bell size={32} className="mx-auto mb-3 text-gray-400" />
+                  <p className="text-gray-500 dark:text-gray-400">No notifications yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Settings View */}
+        {currentTab === 'settings' && (
+          <div className="p-4">
+            <h2 className="text-lg font-bold mb-3">Settings</h2>
+            <div className="max-w-md mx-auto space-y-4">
+              <div className={`p-4 rounded-lg shadow-md ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <h3 className="font-medium mb-3">Appearance</h3>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Dark Mode</span>
+                  <button
+                    onClick={toggleTheme}
+                    className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                  >
+                    {isDarkMode ? (
+                      <Sun size={20} className="text-amber-500" />
+                    ) : (
+                      <Moon size={20} className="text-gray-600" />
+                    )}
+                  </button>
                 </div>
               </div>
               
-              <h3 className="font-medium text-sm uppercase tracking-wider mb-2 mt-6 text-gray-500 dark:text-gray-400">Recent Notifications</h3>
-              
-              <div className="space-y-3">
-                {notifications.map(notification => (
-                  <div 
-                    key={notification.id} 
-                    className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}
-                  >
-                    <div className="flex items-start">
-                      {notification.severity === 'warning' && (
-                        <AlertTriangle size={18} className="text-amber-500 mr-2 flex-shrink-0 mt-1" />
-                      )}
-                      {notification.severity === 'danger' && (
-                        <AlertTriangle size={18} className="text-red-500 mr-2 flex-shrink-0 mt-1" />
-                      )}
-                      {notification.severity === 'info' && (
-                        <Bell size={18} className="text-blue-500 mr-2 flex-shrink-0 mt-1" />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-sm">{notification.message}</p>
-                        <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          <Clock size={12} className="inline mr-1" />
-                          {notification.time}
-                        </p>
-                      </div>
+              <div className={`p-4 rounded-lg shadow-md ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <h3 className="font-medium mb-3">Notification Settings</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Push Notifications</span>
+                    <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                      <input type="checkbox" id="push-toggle" className="sr-only" defaultChecked />
+                      <label
+                        htmlFor="push-toggle"
+                        className="block h-6 overflow-hidden rounded-full bg-gray-300 dark:bg-gray-700 cursor-pointer"
+                      >
+                        <span className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform ${true ? 'translate-x-4' : 'translate-x-0'}`}></span>
+                      </label>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Safety View */}
-        {currentTab === 'safety' && (
-          <div className="p-4">
-            <h2 className="text-lg font-bold mb-4">Safety Information</h2>
-            
-            <div className="max-w-md mx-auto">
-              <div className={`mb-6 p-4 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
-                <h3 className="font-bold flex items-center">
-                  <Shield size={18} className="text-blue-600 mr-2" />
-                  Emergency Contacts
-                </h3>
-                
-                <div className="mt-3 space-y-3">
-                  <button className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors shadow-sm">
-                    Call Emergency Services
-                  </button>
-                  <button className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm">
-                    Contact Event Security
-                  </button>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Sound Alerts</span>
+                    <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                      <input type="checkbox" id="sound-toggle" className="sr-only" defaultChecked />
+                      <label
+                        htmlFor="sound-toggle"
+                        className="block h-6 overflow-hidden rounded-full bg-gray-300 dark:bg-gray-700 cursor-pointer"
+                      >
+                        <span className={`block h-6 w-6 rounded-full bg-white shadow transform transition-transform ${true ? 'translate-x-4' : 'translate-x-0'}`}></span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <div className={`mb-6 p-4 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
-                <h3 className="font-bold flex items-center">
-                  <Zap size={18} className="text-amber-500 mr-2" />
-                  Quick Safety Tips
-                </h3>
-                
-                <ul className={`mt-3 space-y-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  <li className="flex items-start">
-                    <span className="inline-block w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2 mt-0.5">1</span>
-                    Stay aware of your surroundings at all times
-                  </li>
-                  <li className="flex items-start">
-                    <span className="inline-block w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2 mt-0.5">2</span>
-                    Move to less crowded areas if density is high
-                  </li>
-                  <li className="flex items-start">
-                    <span className="inline-block w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2 mt-0.5">3</span>
-                    Keep belongings secure and close to your body
-                  </li>
-                  <li className="flex items-start">
-                    <span className="inline-block w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2 mt-0.5">4</span>
-                    Establish meeting points with companions
-                  </li>
-                  <li className="flex items-start">
-                    <span className="inline-block w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs mr-2 mt-0.5">5</span>
-                    Follow official guidance and instructions
-                  </li>
-                </ul>
-              </div>
-              
-              <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
-                <h3 className="font-bold flex items-center">
-                  <MapIcon size={18} className="text-green-600 mr-2" />
-                  Safe Zones & Exits
-                </h3>
-                
-                {userLocation ? (
-                  <div className="mt-3 h-40 rounded overflow-hidden">
-                    <MapContainer 
-                      center={[userLocation.latitude, userLocation.longitude]} 
-                      zoom={15} 
-                      style={{ height: '100%', width: '100%' }}
-                      attributionControl={false}
-                      zoomControl={false}
-                      dragging={false}
-                      touchZoom={false}
-                      scrollWheelZoom={false}
-                      doubleClickZoom={false}
+              <div className={`p-4 rounded-lg shadow-md ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <h3 className="font-medium mb-3">Hardware Settings</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm block">Arduino Alert Device</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {isArduinoConnected ? "Connected" : isArduinoConnecting ? "Connecting..." : "Not connected"}
+                      </span>
+                    </div>
+                    <button 
+                      className={`px-3 py-1 text-xs rounded-lg ${
+                        isArduinoConnected 
+                          ? 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200' 
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                      onClick={manualConnectToArduino}
+                      disabled={isArduinoConnected || isArduinoConnecting}
                     >
-                      <TileLayer
-                        url={isDarkMode ? 
-                          "https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png" : 
-                          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        }
+                      {isArduinoConnected ? "Connected" : isArduinoConnecting ? "Connecting..." : "Connect"}
+                    </button>
+                  </div>
+                  
+                  {isArduinoConnected && (
+                    <div className="mt-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs">Alert Threshold</span>
+                        <span className="text-xs font-semibold">{alertThreshold}%</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="10" 
+                        max="90" 
+                        step="5" 
+                        value={alertThreshold}
+                        onChange={handleThresholdChange}
+                        className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-300 dark:bg-gray-700"
                       />
-                      <Marker position={[userLocation.latitude, userLocation.longitude]} />
-                    </MapContainer>
-                  </div>
-                ) : (
-                  <div className="mt-3 bg-gray-200 dark:bg-gray-700 h-40 rounded flex items-center justify-center">
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Enable location to view safe zones
-                    </p>
-                  </div>
-                )}
-                
-                <div className="mt-3 space-y-2">
-                  <div className={`p-2 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} text-sm flex items-center`}>
-                    <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-                    <span>Main Exit - 300m northeast</span>
-                  </div>
-                  <div className={`p-2 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} text-sm flex items-center`}>
-                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                    <span>Medical Station - 150m west</span>
-                  </div>
-                  <div className={`p-2 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'} text-sm flex items-center`}>
-                    <div className="w-3 h-3 rounded-full bg-amber-500 mr-2"></div>
-                    <span>Emergency Exit - 200m south</span>
-                  </div>
+                      
+                      <button 
+                        className="mt-3 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+                        onClick={() => sendAlertToArduino(`ALERT:DENSITY:${crowdDensity}`)}
+                      >
+                        Test Arduino Alert
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+              
+              <button
+                onClick={handleLogout}
+                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center"
+              >
+                <LogOut size={16} className="mr-2" />
+                <span>Logout</span>
+              </button>
             </div>
           </div>
         )}
@@ -590,17 +753,11 @@ const UserDashboard = () => {
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         isDarkMode={isDarkMode}
+        alertLevel={alertLevel}
+        notifications={notifications}
       />
-      
-      {/* Overlay when menu is open */}
-      {isMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20"
-          onClick={() => setIsMenuOpen(false)}
-        ></div>
-      )}
     </div>
   );
 };
 
-export default UserDashboard;
+export default UserDasboard;
