@@ -1,15 +1,50 @@
+import 'package:electrons/firebase_options.dart';
+import 'package:electrons/screens/onboardscreen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'mainwrapper.dart';
-/*import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'package:firebase_auth/firebase_auth.dart';*/
 
-/*void main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
-  );*/
-void main(){
+  );
+
+  // Request notification permissions (iOS-specific)
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    announcement: false,
+    badge: true,
+    carPlay: false,
+    criticalAlert: false,
+    provisional: false,
+    sound: true,
+  );
+
+  print('User granted permission: ${settings.authorizationStatus}');
+
+  // Initialize Firebase Messaging and set up listeners
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    print("Notification received: ${message.notification?.title}");
+    // Show a snackbar or dialog for the notification
+  });
+
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    print("Notification clicked: ${message.notification?.title}");
+    // Handle navigation based on the notification
+  });
+
+  FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+    if (message != null) {
+      print("Notification launched the app: ${message.notification?.title}");
+      // Navigate to a specific screen if needed
+    }
+  });
+
+  // Subscribe to topic
+  await FirebaseMessaging.instance.subscribeToTopic('stampede-alerts');
+
   runApp(MyApp());
 }
 
@@ -17,64 +52,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Mainwrapper(),
+      home: OnboardingScreen(),
     );
   }
 }
-/*
-
-class AuthCheck extends StatefulWidget {
-  @override
-  _AuthCheckState createState() => _AuthCheckState();
-}
-
-class _AuthCheckState extends State<AuthCheck> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkUserStatus();
-    });
-  }
-
-  Future<void> _checkUserStatus() async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-
-      if (user == null) {
-        // No user logged in
-        _navigateTo(PhoneLoginScreen());
-        return;
-      }
-
-      String? token = await user.getIdToken();
-
-      if (token != null && token.isNotEmpty) {
-        // User logged in with valid token
-        _navigateTo(Mainwrapper());
-      } else {
-        // Token invalid or empty
-        _navigateTo(PhoneLoginScreen());
-      }
-    } catch (e) {
-      // Handle errors (e.g., Firebase or network issues)
-      _navigateTo(PhoneLoginScreen());
-    }
-  }
-
-  void _navigateTo(Widget screen) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => screen),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(), // Show loading indicator while checking the status
-      ),
-    );
-  }
-}*/

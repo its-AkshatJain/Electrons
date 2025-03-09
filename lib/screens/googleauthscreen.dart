@@ -1,6 +1,7 @@
+import 'package:electrons/mainwrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter_signin_button/flutter_signin_button.dart';
 
 class GoogleAuth extends StatefulWidget {
   const GoogleAuth({super.key});
@@ -47,7 +48,8 @@ class _GoogleAuthState extends State<GoogleAuth> {
                 const SizedBox(height: 30),
 
                 // Illustration (Optional: Add a placeholder or use an asset image)
-                Container(
+                Image.asset('assets/images/login.png'),
+                /*Container(
                   width: screenWidth * 0.6,
                   height: screenHeight * 0.3,
                   decoration: BoxDecoration(
@@ -67,30 +69,25 @@ class _GoogleAuthState extends State<GoogleAuth> {
                     size: 100,
                     color: Colors.blue,
                   ),
-                ),
+                ),*/
                 const SizedBox(height: 40),
 
                 // Google Sign-In Button
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Handle Google Sign-In Logic
-                  },
-                  icon: const Icon(FontAwesomeIcons.google, color: Colors.red),
-                  label: const Text(
-                    'Sign in with Google',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white, // Replaces 'primary'
-                    foregroundColor: Colors.black, // Replaces 'onPrimary'
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 15,
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
+                  child: SizedBox(
+                    width: 300,
+                    height: 50,
+                    child: SignInButton(
+                      Buttons.Google,
+                      text: "Continue with Google",
+                      onPressed: () {
+                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => Mainwrapper(),));
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    side: const BorderSide(color: Colors.black12, width: 1),
                   ),
                 ),
 

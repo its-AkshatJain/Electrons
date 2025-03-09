@@ -96,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               const Icon(
                                 Icons.location_on,
                                 size: 24,
-                                color: Color(0xFFFC4E37),
+                                color: Colors.lightBlueAccent,
                               ),
                               const SizedBox(width: 4),
                               Text(
