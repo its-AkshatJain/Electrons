@@ -348,7 +348,7 @@ const UserDashboard = () => {
     if (!userLocation) return;
     // Define 4 points relative to the user's location:
     const stampedeZone = { id: 'Stampede', lat: userLocation.latitude, lng: userLocation.longitude };
-    const safeZoneA = { id: 'Gate 1', lat: 31.7084291, lng: 76.5273526 };
+    const safeZoneA = { id: 'Gate 1', lat: 31.70184318199131, lng: 76.52270246412306 };
     const safeZoneB = { id: 'Gate 2', lat: 31.7088754, lng: 76.5226386 };
     
     // Save these points in state for rendering.
